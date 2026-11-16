@@ -1,0 +1,38 @@
+[
+  {
+    "id": "odai-001",
+    "type": "text",
+    "text": "【ダミー】新しくできた「帰宅部・強化指定校」。毎日どんな練習をしている？",
+    "enabled": true
+  },
+  {
+    "id": "odai-002",
+    "type": "text",
+    "text": "【ダミー】宇宙人が地球の学校に転校してきた。自己紹介の最初のひとことは？",
+    "enabled": true
+  },
+  {
+    "id": "odai-003",
+    "type": "text",
+    "text": "【ダミー】AIが作った時間割。5時間目の教科は？",
+    "enabled": true
+  },
+  {
+    "id": "odai-004",
+    "type": "image",
+    "text": "写真でひとこと",
+    "image": "/odai/odai-004.png",
+    "alt": "【ダミー】緑色一色の画像（プレースホルダー）",
+    "credit": "自作（プレースホルダー）",
+    "enabled": true
+  },
+  {
+    "id": "odai-005",
+    "type": "image",
+    "text": "写真でひとこと",
+    "image": "/odai/odai-005.png",
+    "alt": "【ダミー】青色一色の画像（プレースホルダー）",
+    "credit": "自作（プレースホルダー）",
+    "enabled": true
+  }
+]

@@ -1,0 +1,31 @@
+{
+  "siteName": "IPPOMグランプリ",
+  "logoMain": "IPPOM",
+  "logoSub": "グランプリ",
+  "ipponWord": "IPPOM",
+  "grades": {
+    "S": "秀",
+    "A": "優",
+    "B": "良",
+    "C": "可",
+    "F": "不可"
+  },
+  "noAnswerText": "回答なし",
+  "thinkingText": "考え中…",
+  "disclaimer": "本サイトは授業課題として制作した非公式のパロディ作品です。テレビ番組および放送局とは一切関係ありません。",
+  "periodNote": "公開は期間限定（{date}まで）で、合言葉を知る授業関係者以外は内容を閲覧できない仕組みになっています。",
+  "closedText": "公開は終了しました",
+  "creator": {
+    "name": "（制作者名を入れる）",
+    "contact": "（連絡先を入れる）"
+  },
+  "credits": [],
+  "sounds": {
+    "tick": null,
+    "ippon": null,
+    "oshii": null,
+    "stamp": null,
+    "stampTop": null,
+    "stampFail": null
+  }
+}

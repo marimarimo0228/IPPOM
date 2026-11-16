@@ -1,0 +1,88 @@
+"use client";
+
+import { hostStep, pendingNpcSeats, type HostCtx } from "../game/engine";
+import { randomNpcVote } from "../game/logic";
+import type { Room, RoomPatch } from "../game/types";
+import type { RoomStore } from "./store";
+
+/** NPC席の採点。席番号 → 点 を返す。段階4で /api/judge を呼ぶ実装に差し替える。 */
+export type NpcJudge = (room: Room, seats: number[]) => Promise<Record<number, 0 | 1 | 2>>;
+
+/** 乱数で採点するNPC。少し考えているような間を置く。 */
+export const randomJudge: NpcJudge = async (_room, seats) => {
+  await new Promise((resolve) => setTimeout(resolve, 600 + Math.random() * 900));
+  const votes: Record<number, 0 | 1 | 2> = {};
+  for (const seat of seats) votes[seat] = randomNpcVote(Math.random);
+  return votes;
+};
+
+const TICK_MS = 100;
+
+/**
+ * ホストの端末で動かす進行役。自分がホストのときだけ、
+ * 締切の経過や回答・票の到着を見て状態を進める。
+ */
+export function runHost(store: RoomStore, ctx: HostCtx, judge: NpcJudge): () => void {
+  let busy = false;
+  let judgedRound = -1;
+  let stopped = false;
+
+  const tick = async () => {
+    if (busy || stopped) return;
+    const room = store.get();
+    if (!room || room.hostId !== store.playerId) return;
+
+    if (room.state === "JUDGING" && judgedRound !== room.round) {
+      judgedRound = room.round;
+      void requestNpcVotes(room);
+    }
+
+    const patch = hostStep(room, store.now(), ctx);
+    if (!patch) return;
+    busy = true;
+    try {
+      await store.hostPatch(patch);
+    } finally {
+      busy = false;
+    }
+  };
+
+  const requestNpcVotes = async (room: Room) => {
+    const seats = pendingNpcSeats(room);
+    if (seats.length === 0) return;
+    let votes: Record<number, 0 | 1 | 2>;
+    try {
+      votes = await judge(room, seats);
+    } catch {
+      return; // 締切時に乱数で埋まる
+    }
+    const latest = store.get();
+    if (stopped || !latest || latest.round !== room.round || latest.state !== "JUDGING") return;
+    const patch: RoomPatch = {};
+    for (const seat of pendingNpcSeats(latest)) {
+      if (votes[seat] !== undefined) patch[`votes/${seat}`] = votes[seat];
+    }
+    if (Object.keys(patch).length > 0) await store.hostPatch(patch);
+  };
+
+  const timer = setInterval(tick, TICK_MS);
+  const unsubscribe = store.subscribe(() => void tick());
+  void tick();
+
+  return () => {
+    stopped = true;
+    clearInterval(timer);
+    unsubscribe();
+  };
+}
+
+/** デバッグ用：/room?total=7 のように合計点を固定する。開発時か NEXT_PUBLIC_DEBUG=1 のときだけ有効。 */
+export function readDebugTotal(): number | null {
+  const enabled =
+    process.env.NODE_ENV !== "production" || process.env.NEXT_PUBLIC_DEBUG === "1";
+  if (!enabled || typeof window === "undefined") return null;
+  const raw = new URLSearchParams(window.location.search).get("total");
+  if (raw === null || !/^\d+$/.test(raw)) return null;
+  const value = Number(raw);
+  return value >= 0 && value <= 10 ? value : null;
+}
