@@ -1,8 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { ANSWER_MS, JUDGE_MIN_MS, JUDGE_MS, ODAI_MS } from "./constants";
+import { ANSWERER_GRACE_MS, ANSWER_MS, JUDGE_MIN_MS, JUDGE_MS, ODAI_MS } from "./constants";
 import {
   advanceFromGrade,
   advanceFromResult,
+  presenceStep,
   backToLobby,
   hostStep,
   startGame,
@@ -53,6 +54,7 @@ function lobby(names: string[]): Room {
     total: null,
     players,
     seats: [],
+    benched: {},
     votes: {},
     scores: {},
     usedOdai: {},
@@ -297,5 +299,101 @@ describe("Firebase のデータの整形", () => {
 
   it("合言葉は全角・半角と前後の空白をならす", () => {
     expect(normalizePassphrase("  ＡＢＣ１２３ ")).toBe("ABC123");
+  });
+});
+
+describe("切断", () => {
+  const ctx: HostCtx = { odaiIds: ODAI_IDS, rng: seededRng(8) };
+  const offline = (room: Room, id: string, leftAt: number) =>
+    applyPatch(room, { [`players/${id}/online`]: false, [`players/${id}/leftAt`]: leftAt });
+
+  function started(names: string[]) {
+    const room = lobby(names);
+    return applyPatch(room, startGame(room, 0, ctx)!);
+  }
+
+  it("審査員が切断すると席がNPCに替わり、再接続で人間に戻る", () => {
+    let room = started(["A", "B", "C"]);
+    expect(room.seats.slice(0, 2)).toEqual(["p2", "p3"]);
+    room = offline(room, "p2", 100);
+    room = applyPatch(room, presenceStep(room, 200, ctx)!);
+    expect(isNpcSeat(room.seats[0])).toBe(true);
+    expect(new Set(room.seats).size).toBe(5);
+    expect(room.benched).toEqual({ "0": "p2" });
+
+    room = applyPatch(room, { "players/p2/online": true, "players/p2/leftAt": null });
+    room = applyPatch(room, presenceStep(room, 300, ctx)!);
+    expect(room.seats[0]).toBe("p2");
+    expect(room.benched).toEqual({});
+    expect(presenceStep(room, 400, ctx)).toBeNull();
+  });
+
+  it("審査の途中で替わった席は、その場で乱数採点される", () => {
+    let room = started(["A", "B"]);
+    room = applyPatch(room, hostStep(room, ODAI_MS, ctx)!);
+    room = applyPatch(room, { answer: "回答" });
+    room = applyPatch(room, hostStep(room, ODAI_MS, ctx)!);
+    expect(room.state).toBe("JUDGING");
+    room = offline(room, "p2", ODAI_MS + 10);
+    room = applyPatch(room, presenceStep(room, ODAI_MS + 20, ctx)!);
+    expect(isNpcSeat(room.seats[0])).toBe(true);
+    expect([0, 1, 2]).toContain(room.votes["0"]);
+    // 票が入ったあとに戻ってきても、このラウンドはNPCのまま。
+    room = applyPatch(room, { "players/p2/online": true });
+    expect(presenceStep(room, ODAI_MS + 30, ctx)).toBeNull();
+  });
+
+  it("回答者が1回目で切断すると、猶予のあと成績なしで次の回答者へ進む", () => {
+    let room = started(["A", "B"]);
+    room = offline(room, "p1", 1000);
+    // p1 は審査員ではないので、猶予の間は何も起きない。
+    expect(presenceStep(room, 1000 + ANSWERER_GRACE_MS - 1, ctx)).toBeNull();
+    room = applyPatch(room, presenceStep(room, 1000 + ANSWERER_GRACE_MS, ctx)!);
+    expect(room.state).toBe("ODAI");
+    expect(room.answererId).toBe("p2");
+    expect(room.attempt).toBe(1);
+    expect(room.scores.p1).toBeUndefined();
+  });
+
+  it("回答者が2回目で切断すると、1回目の点数で成績発表になる", () => {
+    let room = started(["A", "B"]);
+    const played = playRound(room, ctx, 0, [2, 2, 2, 1, 0]);
+    room = applyPatch(played.room, advanceFromResult(played.room, played.now, ctx)!);
+    expect(room.attempt).toBe(2);
+    room = offline(room, "p1", played.now);
+    room = applyPatch(room, presenceStep(room, played.now + ANSWERER_GRACE_MS, ctx)!);
+    expect(room.state).toBe("GRADE");
+    expect(room.scores.p1).toMatchObject({ first: 7, best: 7, grade: "B" });
+    expect(room.scores.p1.second).toBeUndefined();
+  });
+
+  it("切断している人の番は飛ばし、誰も残っていなければ終了する", () => {
+    let room = started(["A", "B", "C"]);
+    room = offline(room, "p2", 0);
+    room = applyPatch(room, { state: "GRADE" });
+    room = applyPatch(room, advanceFromGrade(room, 5000, ctx)!);
+    expect(room.answererId).toBe("p3");
+    room = offline(room, "p3", 6000);
+    room = applyPatch(room, presenceStep(room, 6000 + ANSWERER_GRACE_MS, ctx)!);
+    expect(room.state).toBe("FINISHED");
+  });
+});
+
+describe("ラウンド開始後の再接続", () => {
+  it("席がなかった人が審査の前に戻ると、NPCと交代して座る", () => {
+    const ctx: HostCtx = { odaiIds: ODAI_IDS, rng: seededRng(11) };
+    let room = lobby(["A", "B", "C"]);
+    room = applyPatch(room, startGame(room, 0, ctx)!);
+    // C が切断したまま次のラウンドが始まる。
+    room = applyPatch(room, { "players/p3/online": false, "players/p3/leftAt": 0 });
+    const played = playRound(room, ctx, 0, null);
+    room = applyPatch(played.room, advanceFromResult(played.room, played.now, ctx)!);
+    expect(room.seats).not.toContain("p3");
+    room = applyPatch(room, { "players/p3/online": true, "players/p3/leftAt": null });
+    room = applyPatch(room, presenceStep(room, played.now + 100, ctx)!);
+    expect(room.seats).toContain("p3");
+    expect(room.seats).toContain("p2");
+    expect(new Set(room.seats).size).toBe(5);
+    expect(presenceStep(room, played.now + 200, ctx)).toBeNull();
   });
 });

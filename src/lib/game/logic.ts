@@ -133,6 +133,7 @@ export function applyPatch(room: Room, patch: RoomPatch): Room {
   const fixed = next as unknown as Room;
   // Firebase は空のオブジェクトや null を保持しないので、読む側が困らない形にそろえる。
   fixed.votes ??= {};
+  fixed.benched ??= {};
   fixed.scores ??= {};
   fixed.usedOdai ??= {};
   fixed.players ??= {};
@@ -187,6 +188,7 @@ export function normalizeRoom(raw: unknown): Room | null {
     total: numOrNull(r.total),
     players: toRecord<Player>(r.players),
     seats: toArray(r.seats),
+    benched: toRecord<string>(r.benched),
     votes: toRecord<number>(r.votes),
     scores: toRecord<Score>(r.scores),
     usedOdai: toRecord<true>(r.usedOdai),

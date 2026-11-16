@@ -1,7 +1,8 @@
 "use client";
 
-import { hostStep, pendingNpcSeats, type HostCtx } from "../game/engine";
-import { randomNpcVote } from "../game/logic";
+import { HOST_GRACE_MS } from "../game/constants";
+import { hostStep, pendingNpcSeats, presenceStep, type HostCtx } from "../game/engine";
+import { joinOrder, randomNpcVote } from "../game/logic";
 import type { Room, RoomPatch } from "../game/types";
 import type { RoomStore } from "./store";
 
@@ -26,18 +27,37 @@ export function runHost(store: RoomStore, ctx: HostCtx, judge: NpcJudge): () => 
   let busy = false;
   let judgedRound = -1;
   let stopped = false;
+  let hostGoneSince: number | null = null;
+
+  /** ホストが切断したままなら、入室順で最初の人が引き継ぐ。 */
+  const watchHost = (room: Room) => {
+    if (room.players[room.hostId]?.online) {
+      hostGoneSince = null;
+      return;
+    }
+    hostGoneSince ??= store.now();
+    if (store.now() - hostGoneSince < HOST_GRACE_MS) return;
+    if (joinOrder(room.players)[0] !== store.playerId) return;
+    hostGoneSince = null;
+    void store.claimHost(room.hostId).catch(() => {});
+  };
 
   const tick = async () => {
     if (busy || stopped) return;
     const room = store.get();
-    if (!room || room.hostId !== store.playerId) return;
+    if (!room) return;
+    if (room.hostId !== store.playerId) {
+      watchHost(room);
+      return;
+    }
 
     if (room.state === "JUDGING" && judgedRound !== room.round) {
       judgedRound = room.round;
       void requestNpcVotes(room);
     }
 
-    const patch = hostStep(room, store.now(), ctx);
+    const now = store.now();
+    const patch = presenceStep(room, now, ctx) ?? hostStep(room, now, ctx);
     if (!patch) return;
     busy = true;
     try {

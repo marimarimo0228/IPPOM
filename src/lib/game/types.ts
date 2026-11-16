@@ -15,6 +15,8 @@ export interface Player {
   name: string;
   joinedAt: number;
   online: boolean;
+  /** 切断した時刻。つながっている間はない */
+  leftAt?: number;
 }
 
 export interface Score {
@@ -49,6 +51,8 @@ export interface Room {
   players: Record<string, Player>;
   /** 審査員5席。playerId か "npc:<id>" */
   seats: string[];
+  /** 切断でNPCに置き換えた席 → 元のプレイヤーID。再接続したら戻す */
+  benched: Record<string, string>;
   /** 席番号 → 点 */
   votes: Record<string, number>;
   scores: Record<string, Score>;

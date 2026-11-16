@@ -21,6 +21,8 @@ export interface RoomStore {
   submitAnswer(text: string): Promise<void>;
   /** 審査員：自分の席の票を入れる（変更不可） */
   castVote(seat: number, points: 0 | 1 | 2): Promise<void>;
+  /** ホストが切断しているとき、自分がホストを引き継ぐ */
+  claimHost(offlineHostId: string): Promise<void>;
   /** ホスト：状態を進める差分を書き込む */
   hostPatch(patch: RoomPatch): Promise<void>;
   leave(): Promise<void>;
@@ -54,6 +56,7 @@ export class LocalRoomStore implements RoomStore {
       total: null,
       players: { [playerId]: { name, joinedAt: now, online: true } },
       seats: [],
+      benched: {},
       votes: {},
       scores: {},
       usedOdai: {},
@@ -99,6 +102,10 @@ export class LocalRoomStore implements RoomStore {
   async hostPatch(patch: RoomPatch) {
     if (!this.room || this.room.hostId !== this.playerId) return;
     this.write(patch);
+  }
+
+  async claimHost() {
+    // 1人だけの部屋なので、引き継ぎは起きない。
   }
 
   async leave() {

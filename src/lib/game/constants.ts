@@ -15,6 +15,15 @@ export const JUDGE_MS = 8_000;
 /** 全員の票がそろっても、回答を読む時間としてこれだけは JUDGING にとどまる（仮）。 */
 export const JUDGE_MIN_MS = 2_500;
 
+/** 回答者の切断は、一瞬の通信切れで無効にならないよう、これだけ待ってから扱う（仮）。 */
+export const ANSWERER_GRACE_MS = 5_000;
+/** ホストの切断は、これだけ続いたら次の人が引き継ぐ（仮）。 */
+export const HOST_GRACE_MS = 3_000;
+/** 最後の人が抜けてから部屋を消すまで（仮）。 */
+export const ROOM_EMPTY_TTL_MS = 10 * 60_000;
+/** 作成から部屋を消すまで（仮）。 */
+export const ROOM_MAX_AGE_MS = 3 * 60 * 60_000;
+
 /** 状態を書き込んでから演出を始めるまでの猶予。全端末に届くのを待つ。 */
 export const REVEAL_LEAD_MS = 600;
 export const TIER_INTERVAL_MS = 350;

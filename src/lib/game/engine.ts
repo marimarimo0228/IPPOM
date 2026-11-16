@@ -2,6 +2,7 @@
 // どれも「今の部屋データ → 差分」を返すだけで、書き込みは呼び出し側が行う。
 
 import {
+  ANSWERER_GRACE_MS,
   ANSWER_MS,
   JUDGE_MIN_MS,
   JUDGE_MS,
@@ -19,7 +20,7 @@ import {
   revealSchedule,
   type Rng,
 } from "./logic";
-import { isNpcSeat } from "./npc";
+import { isNpcSeat, NPC_PREFIX, NPCS } from "./npc";
 import type { Room, RoomPatch } from "./types";
 
 export interface HostCtx {
@@ -61,6 +62,7 @@ function roundPatch(
     revealAt: null,
     deadline: now + ODAI_MS,
     seats: assignSeats(room.players, answererId, ctx.rng),
+    benched: null,
   };
   if (odai.reset) patch.usedOdai = { [odai.id]: true };
   else patch[`usedOdai/${odai.id}`] = true;
@@ -96,11 +98,78 @@ function gradePatch(room: Room, now: number): RoomPatch {
 /** GRADE で押すボタン。次の回答者へ交代、最後の人なら FINISHED へ。 */
 export function advanceFromGrade(room: Room, now: number, ctx: HostCtx): RoomPatch | null {
   if (room.state !== "GRADE") return null;
-  const nextTurn = room.turn + 1;
-  if (nextTurn >= room.order.length) {
-    return { state: "FINISHED", deadline: null, revealAt: null };
+  return nextAnswererPatch(room, now, ctx);
+}
+
+function isOnline(room: Room, id: string | null | undefined): boolean {
+  return !!id && room.players[id]?.online === true;
+}
+
+/** 次の回答者へ。切断している人は飛ばし、残っていなければ FINISHED。 */
+function nextAnswererPatch(room: Room, now: number, ctx: HostCtx): RoomPatch {
+  for (let turn = room.turn + 1; turn < room.order.length; turn++) {
+    if (isOnline(room, room.order[turn])) return roundPatch(room, room.order, turn, 1, now, ctx);
   }
-  return roundPatch(room, room.order, nextTurn, 1, now, ctx);
+  return { state: "FINISHED", deadline: null, revealAt: null };
+}
+
+/**
+ * 切断への対応。ホストの端末が hostStep より先に呼ぶ。
+ * - 回答者が切断：そのラウンドを無効にして次へ（1回目なら成績なし、2回目なら1回目の点で成績発表）。
+ * - 審査員が切断：その席をNPCに置き換える。再接続したら人間に戻す。
+ */
+export function presenceStep(room: Room, now: number, ctx: HostCtx): RoomPatch | null {
+  if (room.state !== "ODAI" && room.state !== "ANSWERING" && room.state !== "JUDGING") return null;
+
+  const answerer = room.answererId ? room.players[room.answererId] : undefined;
+  if (!answerer?.online) {
+    const goneFor = now - (answerer?.leftAt ?? 0);
+    if (goneFor >= ANSWERER_GRACE_MS) {
+      if (room.attempt === 2) {
+        return { ...gradePatch(room, now), answer: null, votes: null, total: null };
+      }
+      return nextAnswererPatch(room, now, ctx);
+    }
+  }
+
+  const patch: RoomPatch = {};
+  const taken = new Set(room.seats);
+  for (let seat = 0; seat < SEAT_COUNT; seat++) {
+    const id = room.seats[seat];
+    const hasVote = isValidVote(room.votes[String(seat)]);
+    if (!id) continue;
+    if (!isNpcSeat(id) && !isOnline(room, id)) {
+      const npc = NPCS.map((n) => NPC_PREFIX + n.id).find((s) => !taken.has(s));
+      if (!npc) continue;
+      taken.add(npc);
+      patch[`seats/${seat}`] = npc;
+      patch[`benched/${seat}`] = id;
+      // 審査の途中で置き換わった席は、その場で乱数採点する。
+      if (room.state === "JUDGING" && !hasVote) patch[`votes/${seat}`] = randomNpcVote(ctx.rng);
+    } else if (isNpcSeat(id) && isOnline(room, room.benched[String(seat)]) && !hasVote) {
+      patch[`seats/${seat}`] = room.benched[String(seat)];
+      patch[`benched/${seat}`] = null;
+    }
+  }
+
+  // ラウンドの開始時に切断していて席がなかった人が、審査の前に戻ってきたらNPCと交代する。
+  if (room.state !== "JUDGING") {
+    const seated = new Set(
+      Array.from({ length: SEAT_COUNT }, (_, seat) =>
+        (patch[`seats/${seat}`] as string | undefined) ?? room.seats[seat],
+      ),
+    );
+    const waiting = room.order.filter(
+      (id) => id !== room.answererId && isOnline(room, id) && !seated.has(id),
+    );
+    for (let seat = SEAT_COUNT - 1; seat >= 0 && waiting.length > 0; seat--) {
+      const untouched = patch[`seats/${seat}`] === undefined;
+      if (untouched && isNpcSeat(room.seats[seat]) && !room.benched[String(seat)]) {
+        patch[`seats/${seat}`] = waiting.shift();
+      }
+    }
+  }
+  return Object.keys(patch).length > 0 ? patch : null;
 }
 
 /** FINISHED → LOBBY。成績は次の開始まで残す。 */

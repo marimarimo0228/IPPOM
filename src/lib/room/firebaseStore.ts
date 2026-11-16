@@ -8,12 +8,18 @@ import {
   ref,
   remove,
   runTransaction,
+  serverTimestamp,
   set,
   update,
   type DatabaseReference,
 } from "firebase/database";
 import { ensureSignedIn, getDb } from "../firebase";
-import { ANSWER_MAX, MAX_HUMANS } from "../game/constants";
+import {
+  ANSWER_MAX,
+  MAX_HUMANS,
+  ROOM_EMPTY_TTL_MS,
+  ROOM_MAX_AGE_MS,
+} from "../game/constants";
 import { clampText, normalizePassphrase, normalizeRoom } from "../game/logic";
 import type { Player, Room, RoomPatch } from "../game/types";
 import type { RoomStore } from "./store";
@@ -37,6 +43,26 @@ export async function roomIdFor(passphrase: string): Promise<string> {
   return Array.from(new Uint8Array(digest), (b) =>
     b.toString(16).padStart(2, "0"),
   ).join("");
+}
+
+/**
+ * 部屋を消してよいか。作成から3時間、または最後の人が抜けてから10分。
+ * サーバー側の常駐処理がないので、次に誰かが同じ合言葉で入ろうとしたときに判定する。
+ */
+function isExpired(
+  raw: Record<string, unknown>,
+  players: Record<string, Player>,
+  now: number,
+): boolean {
+  const list = Object.values(players).filter(
+    (p) => p && typeof p.name === "string",
+  );
+  if (list.length === 0) return true;
+  const createdAt = typeof raw.createdAt === "number" ? raw.createdAt : 0;
+  if (now - createdAt > ROOM_MAX_AGE_MS) return true;
+  if (list.some((p) => p.online)) return false;
+  const lastLeft = Math.max(...list.map((p) => p.leftAt ?? createdAt));
+  return now - lastLeft > ROOM_EMPTY_TTL_MS;
 }
 
 /** Firebase Realtime Database 上の部屋。全端末が同じデータを見る。 */
@@ -69,11 +95,13 @@ export class FirebaseRoomStore implements RoomStore {
     let raw = (await get(roomRef)).val() as Record<string, unknown> | null;
     const players = (raw?.players ?? {}) as Record<string, Player>;
 
-    // 誰もつながっていない部屋は終わったものとして作り直す。
-    if (raw && !Object.values(players).some((p) => p?.online)) {
+    // 期限切れの部屋は、次に誰かが入ろうとしたこの時点で消して作り直す。
+    if (raw && isExpired(raw, players, store.now())) {
       await remove(roomRef);
       raw = null;
     }
+    const inLobby =
+      !raw || raw.state === "LOBBY" || typeof raw.state !== "string";
 
     const alreadyIn = Boolean(raw && players[uid]);
     if (
@@ -90,9 +118,16 @@ export class FirebaseRoomStore implements RoomStore {
     const result = await runTransaction(
       child(roomRef, "players"),
       (current: Record<string, Player> | null) => {
-        const list = current ?? {};
+        const list: Record<string, Player> = {};
+        for (const [id, p] of Object.entries(current ?? {})) {
+          // 名前のない壊れた行と、ロビーで切断したままの人は席を空ける。
+          if (!p || typeof p.name !== "string") continue;
+          if (inLobby && !p.online && id !== uid) continue;
+          list[id] = p;
+        }
         if (list[uid]) {
-          list[uid] = { ...list[uid], name, online: true };
+          // 再接続：同じ席に戻る。
+          list[uid] = { name, joinedAt: list[uid].joinedAt, online: true };
           return list;
         }
         if (Object.keys(list).length >= MAX_HUMANS) return undefined;
@@ -175,15 +210,15 @@ export class FirebaseRoomStore implements RoomStore {
 
   /** 在室管理：つながっている間は online、切れたらサーバー側で自動的に false になる。 */
   private trackPresence() {
-    const onlineRef = child(this.roomRef, `players/${this.playerId}/online`);
+    const mine = child(this.roomRef, `players/${this.playerId}`);
     const stop = onValue(ref(getDb(), ".info/connected"), (snap) => {
       if (snap.val() !== true || this.left) return;
-      void onDisconnect(onlineRef)
-        .set(false)
+      void onDisconnect(mine)
+        .update({ online: false, leftAt: serverTimestamp() })
         .then(() => {
           // 退出後や、部屋から外れたあとに自分の行を作り直さない。
           if (!this.left && this.room?.players[this.playerId])
-            return set(onlineRef, true);
+            return update(mine, { online: true, leftAt: null });
         });
     });
     this.cleanups.push(stop);
@@ -211,6 +246,17 @@ export class FirebaseRoomStore implements RoomStore {
     await update(this.roomRef, patch);
   }
 
+  async claimHost(offlineHostId: string) {
+    // ほかの人が先に引き継いでいたら何もしない。
+    await runTransaction(
+      child(this.roomRef, "hostId"),
+      (current: string | null) =>
+        current === null || current === offlineHostId
+          ? this.playerId
+          : undefined,
+    );
+  }
+
   async leave() {
     this.left = true;
     this.cleanups.forEach((stop) => stop());
@@ -220,7 +266,7 @@ export class FirebaseRoomStore implements RoomStore {
     if (this.spectator || !room) return;
 
     const mine = child(this.roomRef, `players/${this.playerId}`);
-    await onDisconnect(child(mine, "online")).cancel();
+    await onDisconnect(mine).cancel();
     const others = Object.keys(room.players).filter(
       (id) => id !== this.playerId,
     );
@@ -231,7 +277,7 @@ export class FirebaseRoomStore implements RoomStore {
       await remove(mine);
     } else {
       // 進行中は席と成績を残し、切断と同じ扱いにする。
-      await set(child(mine, "online"), false);
+      await update(mine, { online: false, leftAt: serverTimestamp() });
     }
   }
 }
