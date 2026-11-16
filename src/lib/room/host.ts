@@ -62,6 +62,8 @@ export function runHost(store: RoomStore, ctx: HostCtx, judge: NpcJudge): () => 
     busy = true;
     try {
       await store.hostPatch(patch);
+    } catch {
+      // 書き込みが通らなかったときは、次の周回で最新の状態からやり直す。
     } finally {
       busy = false;
     }
@@ -82,7 +84,7 @@ export function runHost(store: RoomStore, ctx: HostCtx, judge: NpcJudge): () => 
     for (const seat of pendingNpcSeats(latest)) {
       if (votes[seat] !== undefined) patch[`votes/${seat}`] = votes[seat];
     }
-    if (Object.keys(patch).length > 0) await store.hostPatch(patch);
+    if (Object.keys(patch).length > 0) await store.hostPatch(patch).catch(() => {});
   };
 
   const timer = setInterval(tick, TICK_MS);

@@ -94,7 +94,7 @@ export function RoomScreen({ store }: { store: RoomStore }) {
     const latest = store.get();
     if (!latest) return;
     const patch = make(latest, store.now(), ctx);
-    if (patch) void store.hostPatch(patch);
+    if (patch) void store.hostPatch(patch).catch(() => {});
   };
   const leave = async () => {
     await leaveRoom();

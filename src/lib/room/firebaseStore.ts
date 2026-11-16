@@ -137,25 +137,52 @@ export class FirebaseRoomStore implements RoomStore {
     );
     if (!result.committed) throw new JoinFailure("full");
 
-    // 最初に入った人がホストになる。
-    const host = await runTransaction(
-      child(roomRef, "hostId"),
-      (current: string | null) => current ?? uid,
-    );
-    if (host.snapshot.val() === uid && typeof raw?.state !== "string") {
-      await update(roomRef, {
-        state: "LOBBY",
-        createdAt: now,
-        round: 0,
-        turn: 0,
-        attempt: 1,
-        noAnswer: false,
+    // ここから先で失敗しても「つながったままの行」が残らないようにする。
+    const mine = child(roomRef, `players/${uid}`);
+    try {
+      await onDisconnect(mine).update({
+        online: false,
+        leftAt: serverTimestamp(),
       });
-    }
 
-    store.trackPresence();
-    await store.listen();
-    return store;
+      // 最初に入った人がホストになる。
+      // すでにホストがいる部屋では書き込みを試みない（ルールで拒否されるため）。
+      const hostRef = child(roomRef, "hostId");
+      if (typeof raw?.hostId !== "string") {
+        await runTransaction(hostRef, (current: string | null) =>
+          current === null ? uid : undefined,
+        ).catch(() => {
+          // 同時に入った別の人が先にホストになった
+        });
+      }
+      const hostId = (await get(hostRef)).val() as string | null;
+      if (hostId === uid && typeof raw?.state !== "string") {
+        await update(roomRef, {
+          state: "LOBBY",
+          createdAt: now,
+          round: 0,
+          turn: 0,
+          attempt: 1,
+          noAnswer: false,
+        });
+      }
+
+      store.trackPresence();
+      await store.listen();
+      return store;
+    } catch (error) {
+      store.left = true;
+      store.cleanups.forEach((stop) => stop());
+      await onDisconnect(mine)
+        .cancel()
+        .catch(() => {});
+      await (
+        alreadyIn
+          ? update(mine, { online: false, leftAt: serverTimestamp() })
+          : remove(mine)
+      ).catch(() => {});
+      throw error;
+    }
   }
 
   /** 参加者に数えずに部屋を見るだけ（スクリーン表示用）。部屋がまだなくても待ち続ける。 */
@@ -248,12 +275,14 @@ export class FirebaseRoomStore implements RoomStore {
 
   async claimHost(offlineHostId: string) {
     // ほかの人が先に引き継いでいたら何もしない。
+    // サーバーで確定するまで手元のデータを書き換えない（確定前にホストとして書き込むと拒否されるため）。
     await runTransaction(
       child(this.roomRef, "hostId"),
       (current: string | null) =>
         current === null || current === offlineHostId
           ? this.playerId
           : undefined,
+      { applyLocally: false },
     );
   }
 
