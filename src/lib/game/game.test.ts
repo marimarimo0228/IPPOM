@@ -164,10 +164,20 @@ describe("席・お題・NPC", () => {
     expect(pickOdai(ODAI_IDS, used, rng).reset).toBe(true);
   });
 
-  it("乱数採点は0〜2を重みどおりに返す", () => {
+  it("乱数採点は0〜2を重みどおりに返す（0点25%・1点45%・2点30%）", () => {
     expect(randomNpcVote(() => 0.1)).toBe(0);
+    expect(randomNpcVote(() => 0.3)).toBe(1);
     expect(randomNpcVote(() => 0.6)).toBe(1);
     expect(randomNpcVote(() => 0.9)).toBe(2);
+  });
+
+  it("乱数採点の平均は1人あたり約1.05点（5人で約5点）", () => {
+    const rng = seededRng(42);
+    let sum = 0;
+    const n = 20000;
+    for (let i = 0; i < n; i++) sum += randomNpcVote(rng);
+    expect(sum / n).toBeGreaterThan(1.0);
+    expect(sum / n).toBeLessThan(1.1);
   });
 
   it("文字数を切りそろえる", () => {

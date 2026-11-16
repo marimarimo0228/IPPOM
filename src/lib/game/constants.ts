@@ -43,5 +43,8 @@ export const GRADE_STAMP_MS = 1_600;
 /** 1部屋あたりの /api/judge の呼び出し上限（仮）。超えたら乱数採点。 */
 export const JUDGE_LIMIT = 50;
 
-/** NPCの乱数採点の重み（0点・1点・2点）。 */
-export const NPC_RANDOM_WEIGHTS = [0.5, 0.3, 0.2] as const;
+/**
+ * NPCの乱数採点の重み（0点・1点・2点）。
+ * 1人あたりの平均は 0×0.25 + 1×0.45 + 2×0.30 = 1.05 点（当初の 0.5/0.3/0.2 の平均 0.7 点の1.5倍）。
+ */
+export const NPC_RANDOM_WEIGHTS = [0.25, 0.45, 0.3] as const;

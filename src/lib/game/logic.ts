@@ -73,7 +73,7 @@ export function pickOdai(
   return { id: pool[Math.floor(rng() * pool.length)], reset: fresh.length === 0 };
 }
 
-/** NPCの乱数採点（0点50%、1点30%、2点20%）。 */
+/** NPCの乱数採点（0点25%、1点45%、2点30%。重みは constants.ts）。 */
 export function randomNpcVote(rng: Rng): 0 | 1 | 2 {
   const r = rng();
   if (r < NPC_RANDOM_WEIGHTS[0]) return 0;
