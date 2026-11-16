@@ -3,19 +3,19 @@
     "id": "odai-001",
     "type": "text",
     "text": "【ダミー】新しくできた「帰宅部・強化指定校」。毎日どんな練習をしている？",
-    "enabled": true
+    "enabled": false
   },
   {
     "id": "odai-002",
     "type": "text",
     "text": "【ダミー】宇宙人が地球の学校に転校してきた。自己紹介の最初のひとことは？",
-    "enabled": true
+    "enabled": false
   },
   {
     "id": "odai-003",
     "type": "text",
     "text": "【ダミー】AIが作った時間割。5時間目の教科は？",
-    "enabled": true
+    "enabled": false
   },
   {
     "id": "odai-004",
@@ -24,7 +24,7 @@
     "image": "/odai/odai-004.png",
     "alt": "【ダミー】緑色一色の画像（プレースホルダー）",
     "credit": "自作（プレースホルダー）",
-    "enabled": true
+    "enabled": false
   },
   {
     "id": "odai-005",
@@ -33,7 +33,7 @@
     "image": "/odai/odai-005.png",
     "alt": "【ダミー】青色一色の画像（プレースホルダー）",
     "credit": "自作（プレースホルダー）",
-    "enabled": true
+    "enabled": false
   },
   {
     "id": "odai-006",
@@ -123,6 +123,66 @@
     "image": "/odai/odai-015.jpg",
     "alt": "白い花で飾られた結婚式場のチャペルの祭壇に、銀色の鍋とおたまが1つずつ置かれている。",
     "credit": "Gemini（Google）で生成",
+    "enabled": true
+  },
+  {
+    "id": "odai-016",
+    "type": "text",
+    "text": "新しくできた「ゆるすぎる校則」。どんな校則？",
+    "enabled": true
+  },
+  {
+    "id": "odai-017",
+    "type": "text",
+    "text": "冷蔵庫が家出した。置き手紙に書いてあったひとことは？",
+    "enabled": true
+  },
+  {
+    "id": "odai-018",
+    "type": "text",
+    "text": "100年後の教科書に載っている「2026年の大事件」とは？",
+    "enabled": true
+  },
+  {
+    "id": "odai-019",
+    "type": "text",
+    "text": "まったく売れない、新しいおにぎりの具とは？",
+    "enabled": true
+  },
+  {
+    "id": "odai-020",
+    "type": "text",
+    "text": "天気予報士が、つい本音を言ってしまった。なんと言った？",
+    "enabled": true
+  },
+  {
+    "id": "odai-021",
+    "type": "text",
+    "text": "桃太郎が鬼ヶ島に行かなかった理由とは？",
+    "enabled": true
+  },
+  {
+    "id": "odai-022",
+    "type": "text",
+    "text": "世界一やる気のない遊園地のアトラクションとは？",
+    "enabled": true
+  },
+  {
+    "id": "odai-023",
+    "type": "text",
+    "text": "入学式で、新入生代表がうっかり言ってしまったひとことは？",
+    "enabled": true
+  },
+  {
+    "id": "odai-024",
+    "type": "text",
+    "text": "落とし物係に届いた、ありえない落とし物とは？",
+    "enabled": true
+  },
+  {
+    "id": "odai-025",
+    "type": "text",
+    "text": "こんな担任の先生はイヤだ。どんな先生？",
     "enabled": true
   }
 ]
