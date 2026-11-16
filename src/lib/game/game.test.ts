@@ -14,6 +14,8 @@ import {
   bestOf,
   clampText,
   gradeFor,
+  normalizePassphrase,
+  normalizeRoom,
   pickOdai,
   randomNpcVote,
   revealSchedule,
@@ -268,5 +270,32 @@ describe("進行", () => {
     room = applyPatch(room, startGame(room, 0, ctx)!);
     const played = playRound(room, ctx, 0, [0, 0, 0, 0, 0]);
     expect(played.room.total).toBe(10);
+  });
+});
+
+describe("Firebase のデータの整形", () => {
+  it("欠けた項目を補い、配列で返ってきた票も読める", () => {
+    const room = normalizeRoom({
+      state: "JUDGING",
+      hostId: "p1",
+      players: { p1: { name: "A", joinedAt: 1, online: true } },
+      seats: { 0: "p2", 1: "npc:gera" },
+      votes: [2, null, 1],
+    });
+    expect(room).not.toBeNull();
+    expect(room!.seats).toEqual(["p2", "npc:gera"]);
+    expect(room!.votes).toEqual({ "0": 2, "2": 1 });
+    expect(room!.scores).toEqual({});
+    expect(room!.answer).toBeNull();
+    expect(room!.attempt).toBe(1);
+  });
+
+  it("state がまだないデータは部屋として扱わない", () => {
+    expect(normalizeRoom({ players: {} })).toBeNull();
+    expect(normalizeRoom(null)).toBeNull();
+  });
+
+  it("合言葉は全角・半角と前後の空白をならす", () => {
+    expect(normalizePassphrase("  ＡＢＣ１２３ ")).toBe("ABC123");
   });
 });

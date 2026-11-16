@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState, type FormEvent } from "react";
 import { NAME_MAX, PASSPHRASE_MAX, PASSPHRASE_MIN } from "@/lib/game/constants";
-import { enterRoom, validateEntry } from "@/lib/room/session";
+import { enterRoom, joinErrorMessage, validateEntry } from "@/lib/room/session";
 import { unlockSound } from "@/lib/sound";
 
 export default function JoinForm() {
@@ -11,8 +11,9 @@ export default function JoinForm() {
   const [name, setName] = useState("");
   const [passphrase, setPassphrase] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
 
-  const submit = (e: FormEvent) => {
+  const submit = async (e: FormEvent) => {
     e.preventDefault();
     const problem = validateEntry(name, passphrase);
     if (problem) {
@@ -20,7 +21,16 @@ export default function JoinForm() {
       return;
     }
     unlockSound();
-    enterRoom(name, passphrase);
+    setError(null);
+    setBusy(true);
+    try {
+      await enterRoom(name, passphrase);
+    } catch (err) {
+      // 満員、進行中、通信エラーなど
+      setError(joinErrorMessage(err));
+      setBusy(false);
+      return;
+    }
     // デバッグ用の ?total=7 などは、そのまま部屋の画面へ引き継ぐ。
     router.push(`/room${window.location.search}`);
   };
@@ -59,9 +69,10 @@ export default function JoinForm() {
       )}
       <button
         type="submit"
-        className="bg-ippon px-4 py-4 text-xl font-black text-ink active:translate-y-0.5"
+        disabled={busy}
+        className="bg-ippon px-4 py-4 text-xl font-black text-ink active:translate-y-0.5 disabled:opacity-50"
       >
-        入室する
+        {busy ? "接続中…" : "入室する"}
       </button>
     </form>
   );

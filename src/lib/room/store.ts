@@ -10,6 +10,8 @@ export interface RoomStore {
   readonly playerId: string;
   /** 表示用の部屋の合言葉 */
   readonly passphrase: string;
+  /** 参加者ではなく見ているだけ（スクリーン表示） */
+  readonly spectator?: boolean;
   /** 最新の部屋データ。変更がない限り同じ参照を返す */
   get(): Room | null;
   subscribe(listener: () => void): () => void;

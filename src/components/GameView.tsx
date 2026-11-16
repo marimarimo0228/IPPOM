@@ -89,7 +89,7 @@ export default function GameView({ store, room, now, children }: Props) {
       {room.state === "ANSWERING" && isAnswerer && <AnswerForm store={store} />}
 
       {/* 画面の高さに収まるよう、カードの幅を高さからも制限する */}
-      <div className="mx-auto w-full" style={{ maxWidth: "min(48rem, 80dvh)" }}>
+      <div className="mx-auto w-full" style={{ maxWidth: "var(--card-max, min(48rem, 80dvh))" }}>
         <AnswerCard lit={lit} finale={finale}>
           {cardText}
         </AnswerCard>

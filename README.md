@@ -11,13 +11,13 @@
 | 段階 | 内容 | 状態 |
 | --- | --- | --- |
 | 1 | ローカルで1人プレイ（NPC審査員5人は乱数採点）、枠の演出、成績発表 | 完了 |
-| 2 | Firebase で部屋を同期、複数人プレイ、`/screen` | 未着手 |
+| 2 | Firebase で部屋を同期、複数人プレイ、`/screen` | 実装済み（複数端末での確認は Firebase の設定後） |
 | 3 | 切断時の扱い、部屋の削除、セキュリティルール | 未着手 |
 | 4 | Groq によるNPC採点（`/api/judge`） | 未着手 |
 | 5 | サイトの合言葉（`/gate`）と公開期限 | 未着手 |
 | 6 | 仕上げと受け入れ確認 | 未着手 |
 
-段階1の時点では、部屋は1台のブラウザの中だけにあります。部屋の合言葉は表示されるだけで、ほかの端末とはつながりません。
+Firebase の環境変数を設定すると、同じ合言葉を入れた端末が同じ部屋に集まります。設定がないときは、部屋は1台のブラウザの中だけにあり、1人プレイになります。
 
 ## ローカルで動かす
 
@@ -31,7 +31,7 @@ npm install
 npm run dev
 ```
 
-http://localhost:3000 を開きます。段階1は環境変数なしで動きます。
+http://localhost:3000 を開きます。環境変数なしでも1人プレイは動きます。
 
 ### 段階1の動作確認
 
@@ -89,7 +89,50 @@ http://localhost:3000 を開きます。段階1は環境変数なしで動きま
   ```
 
 - **`PUBLIC_UNTIL`**：`2026-12-31` のように公開終了日を書く。
-- **`NEXT_PUBLIC_FIREBASE_*`**：[Firebase コンソール](https://console.firebase.google.com) でプロジェクトと Realtime Database を作り、ウェブアプリを追加したときに表示される設定値を写す（段階2で手順を追記する）。
+- **`NEXT_PUBLIC_FIREBASE_*`**：下の「Firebase の設定」を参照。
+
+## Firebase の設定
+
+複数人で遊ぶには Firebase のプロジェクトが必要です。無料の Spark プランで足ります。画面の文言は変わることがあるので、見つからないときは近い名前の項目を探してください。
+
+1. [Firebase コンソール](https://console.firebase.google.com) に Google アカウントでログインし、「プロジェクトを追加」でプロジェクトを作る（Google アナリティクスは不要）。
+2. 左のメニューの「構築」→「Authentication」を開き、「始める」を押す。ログイン方法の一覧で「匿名」を有効にする。
+3. 「構築」→「Realtime Database」を開き、「データベースを作成」を押す。場所を選び、「ロックモード」で作成する。
+4. Realtime Database の「ルール」タブを開き、[database.rules.json](database.rules.json) の内容を貼り付けて「公開」を押す。
+5. 歯車のアイコン →「プロジェクトの設定」→「マイアプリ」でウェブアプリ（`</>`）を追加する。Hosting の設定は不要。
+6. 表示された `firebaseConfig` の値を、次の対応で `.env.local` に書く。
+
+| `firebaseConfig` のキー | 環境変数 |
+| --- | --- |
+| `apiKey` | `NEXT_PUBLIC_FIREBASE_API_KEY` |
+| `authDomain` | `NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN` |
+| `databaseURL` | `NEXT_PUBLIC_FIREBASE_DATABASE_URL` |
+| `projectId` | `NEXT_PUBLIC_FIREBASE_PROJECT_ID` |
+| `appId` | `NEXT_PUBLIC_FIREBASE_APP_ID` |
+
+`databaseURL` が `firebaseConfig` に出ていないときは、Realtime Database の「データ」タブの上部に表示されるURL（`https://…firebasedatabase.app` など）を使います。
+
+7. `npm run dev` を起動し直す。Vercel に公開するときは、同じ5つを Vercel の環境変数にも登録する。
+
+これらの値はブラウザに出る前提のもので、秘密ではありません。保護はセキュリティルールで行います。いまのルールは「匿名認証を済ませた端末なら部屋を読み書きできる」という仮のもので、段階3で絞り込みます。
+
+### 段階2の動作確認
+
+プレイヤーIDはブラウザに保存されるため、同じブラウザのタブ同士は同じ人として扱われます。複数人を試すには、次のどちらかにします。
+
+- 別のブラウザやシークレットウィンドウ、別の端末で開く。
+- 開発時に限り、2つ目以降のタブを http://localhost:3000/?guest=1 から入室する（そのタブだけ別人になる。再読み込みすると別人に変わる）。
+
+確認する内容は次のとおりです。
+
+1. 3つの端末（またはタブ）で同じ合言葉を入れると、ロビーに3人が並び、最初に入った人がホストになる。
+2. ホストが「開始」を押すと、全員の画面が同時に切り替わる。回答者以外には0点・1点・2点のボタンが出る。
+3. 回答者が2ラウンドごとに入室順で交代する。
+4. http://localhost:3000/screen に合言葉を入れると、参加人数に数えられずに同じ演出が出る。
+5. 7人目は「満員です。」と表示されて入れない。
+6. ゲームの進行中に新しい人が入ろうとすると、入れない旨が表示される。
+
+スマホなど別の端末から試すときは、Vercel に公開したURLを使ってください（`http://192.168.…` のようなアドレスでは、ブラウザの制限で合言葉のハッシュ化が動きません）。
 
 ## お題の追加
 
@@ -142,6 +185,7 @@ http://localhost:3000 を開きます。段階1は環境変数なしで動きま
 | `src/lib/room/` | 部屋のデータの読み書きと、ホスト端末の進行役 |
 | `src/lib/sound.ts` | 効果音の合成 |
 | `src/components/` | 画面の部品 |
-| `src/app/` | ページ（`/` と `/room`） |
+| `src/app/` | ページ（`/`、`/room`、`/screen`） |
+| `database.rules.json` | Realtime Database のセキュリティルール |
 
 時間や文字数などの「仮」の値は [src/lib/game/constants.ts](src/lib/game/constants.ts) にまとめてあります。

@@ -140,3 +140,60 @@ export function applyPatch(room: Room, patch: RoomPatch): Room {
   fixed.order ??= [];
   return fixed;
 }
+
+/**
+ * Firebase から読んだ生データを Room の形にそろえる。
+ * Firebase は空のオブジェクトや null を保持せず、0始まりの連番キーを配列で返すことがある。
+ * まだ部屋として成り立っていない（state がない）ときは null。
+ */
+export function normalizeRoom(raw: unknown): Room | null {
+  if (typeof raw !== "object" || raw === null) return null;
+  const r = raw as Record<string, unknown>;
+  if (typeof r.state !== "string" || typeof r.hostId !== "string") return null;
+
+  const toRecord = <T>(value: unknown): Record<string, T> => {
+    const out: Record<string, T> = {};
+    if (typeof value !== "object" || value === null) return out;
+    for (const [key, v] of Object.entries(value)) {
+      if (v !== null && v !== undefined) out[key] = v as T;
+    }
+    return out;
+  };
+  const toArray = (value: unknown): string[] => {
+    if (typeof value !== "object" || value === null) return [];
+    const record = toRecord<string>(value);
+    return Object.keys(record)
+      .sort((a, b) => Number(a) - Number(b))
+      .map((key) => record[key]);
+  };
+  const num = (value: unknown, fallback: number) => (typeof value === "number" ? value : fallback);
+  const numOrNull = (value: unknown) => (typeof value === "number" ? value : null);
+  const strOrNull = (value: unknown) => (typeof value === "string" ? value : null);
+
+  return {
+    state: r.state as Room["state"],
+    hostId: r.hostId,
+    createdAt: num(r.createdAt, 0),
+    order: toArray(r.order),
+    turn: num(r.turn, 0),
+    attempt: r.attempt === 2 ? 2 : 1,
+    round: num(r.round, 0),
+    odaiId: strOrNull(r.odaiId),
+    answererId: strOrNull(r.answererId),
+    answer: strOrNull(r.answer),
+    noAnswer: r.noAnswer === true,
+    deadline: numOrNull(r.deadline),
+    revealAt: numOrNull(r.revealAt),
+    total: numOrNull(r.total),
+    players: toRecord<Player>(r.players),
+    seats: toArray(r.seats),
+    votes: toRecord<number>(r.votes),
+    scores: toRecord<Score>(r.scores),
+    usedOdai: toRecord<true>(r.usedOdai),
+  };
+}
+
+/** 部屋の合言葉を、前後の空白と全角・半角の違いをならした形にする。 */
+export function normalizePassphrase(passphrase: string): string {
+  return passphrase.normalize("NFKC").trim();
+}

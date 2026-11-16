@@ -1,7 +1,8 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useState, useSyncExternalStore } from "react";
+import { useEffect, useState, useSyncExternalStore, type CSSProperties } from "react";
 import GameView from "./GameView";
 import GradeStage from "./GradeStage";
 import Logo from "./Logo";
@@ -17,7 +18,7 @@ import {
 import { joinOrder } from "@/lib/game/logic";
 import type { Room, RoomPatch } from "@/lib/game/types";
 import { randomJudge, readDebugTotal, runHost } from "@/lib/room/host";
-import { leaveRoom, resumeRoom } from "@/lib/room/session";
+import { joinErrorMessage, leaveRoom, resumeRoom } from "@/lib/room/session";
 import type { RoomStore } from "@/lib/room/store";
 import { useClock } from "@/lib/useClock";
 
@@ -27,19 +28,48 @@ const subButton = "w-full border-2 border-white/30 px-4 py-3 text-sm font-bold t
 
 export default function RoomClient() {
   const router = useRouter();
-  const [store] = useState(resumeRoom);
+  const [store, setStore] = useState<RoomStore | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!store) router.replace("/");
-  }, [store, router]);
+    let alive = true;
+    resumeRoom()
+      .then((s) => {
+        if (!alive) return;
+        if (s) setStore(s);
+        else router.replace("/");
+      })
+      .catch((err) => {
+        if (alive) setError(joinErrorMessage(err));
+      });
+    return () => {
+      alive = false;
+    };
+  }, [router]);
 
-  return store ? <RoomScreen store={store} /> : null;
+  if (error) return <Notice text={error} />;
+  return store ? <RoomScreen store={store} /> : <Notice text="接続中…" back={false} />;
 }
 
-function RoomScreen({ store }: { store: RoomStore }) {
+function Notice({ text, back = true }: { text: string; back?: boolean }) {
+  return (
+    <main className="flex flex-1 flex-col items-center justify-center gap-4 px-4 text-center">
+      <p className="text-lg font-bold">{text}</p>
+      {back && (
+        <Link href="/" className="border-2 border-ippon px-4 py-2 font-bold text-ippon">
+          トップへ戻る
+        </Link>
+      )}
+    </main>
+  );
+}
+
+/** 部屋の画面。参加者用（/room）とスクリーン表示（/screen）で共通。 */
+export function RoomScreen({ store }: { store: RoomStore }) {
   const router = useRouter();
   const room = useSyncExternalStore(store.subscribe, store.get, () => null);
   const now = useClock(store, 50);
+  const spectator = store.spectator === true;
   const [ctx] = useState<HostCtx>(() => ({
     odaiIds,
     rng: Math.random,
@@ -47,11 +77,19 @@ function RoomScreen({ store }: { store: RoomStore }) {
   }));
 
   // 自分がホストのあいだだけ、状態を進める役を引き受ける。
-  useEffect(() => runHost(store, ctx, randomJudge), [store, ctx]);
+  useEffect(() => {
+    if (!spectator) return runHost(store, ctx, randomJudge);
+  }, [store, ctx, spectator]);
 
-  if (!room) return null;
+  if (!room) {
+    return spectator ? (
+      <Notice text={`部屋「${store.passphrase}」が作られるのを待っています…`} back={false} />
+    ) : (
+      <Notice text="部屋がなくなりました。" />
+    );
+  }
 
-  const isHost = room.hostId === store.playerId;
+  const isHost = !spectator && room.hostId === store.playerId;
   const act = (make: (room: Room, now: number, ctx: HostCtx) => RoomPatch | null) => {
     const latest = store.get();
     if (!latest) return;
@@ -67,7 +105,13 @@ function RoomScreen({ store }: { store: RoomStore }) {
   const isLastAnswerer = room.turn + 1 >= room.order.length;
 
   return (
-    <main className="mx-auto flex w-full max-w-5xl flex-1 flex-col gap-4 px-3 pb-8 pt-3">
+    <main
+      className={`mx-auto flex w-full flex-1 flex-col gap-4 px-3 pb-8 pt-3 ${
+        spectator ? "max-w-none" : "max-w-5xl"
+      }`}
+      // スクリーン表示では、回答カードを画面いっぱいに近い大きさにする。
+      style={spectator ? ({ "--card-max": "min(100%, 92dvh)" } as CSSProperties) : undefined}
+    >
       <header className="flex items-center gap-3 pr-24">
         <Logo size="sm" />
         {typeof ctx.debugTotal === "number" && (
@@ -82,6 +126,7 @@ function RoomScreen({ store }: { store: RoomStore }) {
           room={room}
           store={store}
           isHost={isHost}
+          spectator={spectator}
           onStart={() => act(startGame)}
           onLeave={leave}
         />
@@ -99,7 +144,7 @@ function RoomScreen({ store }: { store: RoomStore }) {
                 {room.attempt < ROUNDS_PER_ANSWERER ? "2回目へ" : "成績発表へ"}
               </button>
             ) : (
-              <WaitingForHost />
+              !spectator && <WaitingForHost />
             ))}
         </GameView>
       )}
@@ -118,7 +163,7 @@ function RoomScreen({ store }: { store: RoomStore }) {
                 {isLastAnswerer ? "全員の成績を見る" : "次の回答者へ"}
               </button>
             ) : (
-              <WaitingForHost />
+              !spectator && <WaitingForHost />
             )}
           </div>
         </section>
@@ -157,11 +202,13 @@ function RoomScreen({ store }: { store: RoomStore }) {
               ロビーへ戻る
             </button>
           ) : (
-            <WaitingForHost />
+            !spectator && <WaitingForHost />
           )}
-          <button className={subButton} onClick={leave}>
-            退出する
-          </button>
+          {!spectator && (
+            <button className={subButton} onClick={leave}>
+              退出する
+            </button>
+          )}
         </section>
       )}
     </main>
@@ -176,12 +223,14 @@ function Lobby({
   room,
   store,
   isHost,
+  spectator,
   onStart,
   onLeave,
 }: {
   room: Room;
   store: RoomStore;
   isHost: boolean;
+  spectator: boolean;
   onStart: () => void;
   onLeave: () => void;
 }) {
@@ -205,7 +254,7 @@ function Lobby({
             <li key={id} className="flex items-center gap-2 bg-panel px-3 py-2 font-bold">
               <span className="text-white/50">{i + 1}</span>
               <span className="flex-1">{room.players[id].name}</span>
-              {id === store.playerId && <span className="text-xs text-white/50">あなた</span>}
+              {!spectator && id === store.playerId && <span className="text-xs text-white/50">あなた</span>}
               {id === room.hostId && (
                 <span className="bg-ippon px-1.5 text-xs font-black text-ink">ホスト</span>
               )}
@@ -245,11 +294,13 @@ function Lobby({
           開始
         </button>
       ) : (
-        <WaitingForHost />
+        !spectator && <WaitingForHost />
       )}
-      <button className={subButton} onClick={onLeave}>
-        退出する
-      </button>
+      {!spectator && (
+        <button className={subButton} onClick={onLeave}>
+          退出する
+        </button>
+      )}
     </section>
   );
 }
