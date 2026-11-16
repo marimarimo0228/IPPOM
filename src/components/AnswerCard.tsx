@@ -28,8 +28,9 @@ export default function AnswerCard({ children, lit, finale }: Props) {
         <div key={i} className="tier" style={{ "--tier": i } as CSSProperties} />
       ))}
 
+      {/* 10点：段の境目が線に見えないよう、全面を黄色一色で覆ってから文字を出す */}
       {finale?.kind === "ippon" && (
-        <div className="absolute inset-0 flex items-center justify-center">
+        <div className="absolute inset-0 flex items-center justify-center bg-ippon">
           <span
             className="ippon-word font-black italic leading-none tracking-tighter text-ink"
             style={{ fontSize: "34cqh" }}

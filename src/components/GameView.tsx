@@ -103,8 +103,11 @@ export default function GameView({ store, room, now, children }: Props) {
         </>
       )}
 
-      {showing && !room.noAnswer && (
-        <p className="text-center text-sm text-white/60">「{room.answer}」</p>
+      {/* 枠や点数で回答が隠れるので、カードの下にも出しておく */}
+      {showing && (
+        <p className="text-center text-sm text-white/60">
+          {room.noAnswer ? site.noAnswerText : `「${room.answer}」`}
+        </p>
       )}
 
       {room.state === "JUDGING" && mySeat >= 0 && (
