@@ -31,6 +31,9 @@ export default function JoinForm() {
       setBusy(false);
       return;
     }
+    // この画面は移動後も隠れたまま残り、退出して戻ると再び表示される。
+    // 「接続中…」のまま戻らないよう、成功したときも元に戻しておく。
+    setBusy(false);
     // デバッグ用の ?total=7 などは、そのまま部屋の画面へ引き継ぐ。
     router.push(`/room${window.location.search}`);
   };
