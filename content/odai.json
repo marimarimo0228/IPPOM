@@ -34,5 +34,95 @@
     "alt": "【ダミー】青色一色の画像（プレースホルダー）",
     "credit": "自作（プレースホルダー）",
     "enabled": true
+  },
+  {
+    "id": "odai-006",
+    "type": "image",
+    "text": "写真でひとこと",
+    "image": "/odai/odai-006.jpg",
+    "alt": "オフィスの会議室で、スーツに赤いネクタイを締めた柴犬が机の上に立ち、グラフの描かれたホワイトボードを前足で指してプレゼンしている。周りの椅子には誰も座っていない。",
+    "credit": "Gemini（Google）で生成",
+    "enabled": true
+  },
+  {
+    "id": "odai-007",
+    "type": "image",
+    "text": "写真でひとこと",
+    "image": "/odai/odai-007.jpg",
+    "alt": "夕暮れの公園で、ハトが10羽ほど木のベンチの上に一列にきちんと並んでいる。",
+    "credit": "Gemini（Google）で生成",
+    "enabled": true
+  },
+  {
+    "id": "odai-008",
+    "type": "image",
+    "text": "写真でひとこと",
+    "image": "/odai/odai-008.jpg",
+    "alt": "吹雪の雪山の山頂で、登山者がこたつに入ってみかんを食べている後ろ姿。こたつの上には水筒とみかんが置かれている。",
+    "credit": "Gemini（Google）で生成",
+    "enabled": true
+  },
+  {
+    "id": "odai-009",
+    "type": "image",
+    "text": "写真でひとこと",
+    "image": "/odai/odai-009.jpg",
+    "alt": "スーパーの野菜売り場で、大根が1本だけ棚から抜け出し、葉を床に広げて通路に向かって倒れ込んでいる。",
+    "credit": "Gemini（Google）で生成",
+    "enabled": true
+  },
+  {
+    "id": "odai-010",
+    "type": "image",
+    "text": "写真でひとこと",
+    "image": "/odai/odai-010.jpg",
+    "alt": "誰もいない夜の学校の体育館の真ん中に、巨大なプリンが1つだけ置かれ、スポットライトに照らされている。",
+    "credit": "Gemini（Google）で生成",
+    "enabled": true
+  },
+  {
+    "id": "odai-011",
+    "type": "image",
+    "text": "写真でひとこと",
+    "image": "/odai/odai-011.jpg",
+    "alt": "朝の駅のホームで、スマートフォンを見ながら電車を待つ会社員の列の先頭に、ペンギンが1羽だけ並んでいる。",
+    "credit": "Gemini（Google）で生成",
+    "enabled": true
+  },
+  {
+    "id": "odai-012",
+    "type": "image",
+    "text": "写真でひとこと",
+    "image": "/odai/odai-012.jpg",
+    "alt": "掛け軸と生け花のある静かな和室の畳の真ん中に、ロボット掃除機が1台だけ止まっている。",
+    "credit": "Gemini（Google）で生成",
+    "enabled": true
+  },
+  {
+    "id": "odai-013",
+    "type": "image",
+    "text": "写真でひとこと",
+    "image": "/odai/odai-013.jpg",
+    "alt": "海辺の砂浜に赤い自動販売機がぽつんと1台立っていて、その前にカモメが10羽ほど一列に並んでいる。",
+    "credit": "Gemini（Google）で生成",
+    "enabled": true
+  },
+  {
+    "id": "odai-014",
+    "type": "image",
+    "text": "写真でひとこと",
+    "image": "/odai/odai-014.jpg",
+    "alt": "図書館の閲覧席で、眼鏡をかけたトラ柄のネコが椅子に座り、分厚い本に前足を置いて読んでいる。",
+    "credit": "Gemini（Google）で生成",
+    "enabled": true
+  },
+  {
+    "id": "odai-015",
+    "type": "image",
+    "text": "写真でひとこと",
+    "image": "/odai/odai-015.jpg",
+    "alt": "白い花で飾られた結婚式場のチャペルの祭壇に、銀色の鍋とおたまが1つずつ置かれている。",
+    "credit": "Gemini（Google）で生成",
+    "enabled": true
   }
 ]

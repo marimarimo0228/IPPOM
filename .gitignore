@@ -42,3 +42,6 @@ next-env.d.ts
 
 # .env.example だけはコミットする（名前のみ、値は書かない）
 !.env.example
+
+# Gemini で生成したお題画像の元データ（公開用は public/odai に縮小して置く）
+/odai-originals/
