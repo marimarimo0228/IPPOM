@@ -58,6 +58,7 @@ function lobby(names: string[]): Room {
     votes: {},
     scores: {},
     usedOdai: {},
+    judgeCount: 0,
   };
 }
 

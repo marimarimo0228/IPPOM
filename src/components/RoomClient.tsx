@@ -17,7 +17,7 @@ import {
 } from "@/lib/game/engine";
 import { joinOrder } from "@/lib/game/logic";
 import type { Room, RoomPatch } from "@/lib/game/types";
-import { randomJudge, readDebugTotal, runHost } from "@/lib/room/host";
+import { apiJudge, readDebugTotal, runHost } from "@/lib/room/host";
 import { joinErrorMessage, leaveRoom, resumeRoom } from "@/lib/room/session";
 import type { RoomStore } from "@/lib/room/store";
 import { useClock } from "@/lib/useClock";
@@ -78,7 +78,7 @@ export function RoomScreen({ store }: { store: RoomStore }) {
 
   // 自分がホストのあいだだけ、状態を進める役を引き受ける。
   useEffect(() => {
-    if (!spectator) return runHost(store, ctx, randomJudge);
+    if (!spectator) return runHost(store, ctx, apiJudge);
   }, [store, ctx, spectator]);
 
   if (!room) {

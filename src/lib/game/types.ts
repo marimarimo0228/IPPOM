@@ -57,6 +57,8 @@ export interface Room {
   votes: Record<string, number>;
   scores: Record<string, Score>;
   usedOdai: Record<string, true>;
+  /** この部屋で /api/judge を呼んだ回数（上限の判定用） */
+  judgeCount: number;
 }
 
 /**

@@ -60,6 +60,7 @@ export class LocalRoomStore implements RoomStore {
       votes: {},
       scores: {},
       usedOdai: {},
+      judgeCount: 0,
     };
   }
 

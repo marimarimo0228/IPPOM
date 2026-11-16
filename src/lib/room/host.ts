@@ -1,12 +1,13 @@
 "use client";
 
-import { HOST_GRACE_MS } from "../game/constants";
+import { HOST_GRACE_MS, JUDGE_LIMIT } from "../game/constants";
+import { NPC_PREFIX } from "../game/npc";
 import { hostStep, pendingNpcSeats, presenceStep, type HostCtx } from "../game/engine";
 import { joinOrder, randomNpcVote } from "../game/logic";
 import type { Room, RoomPatch } from "../game/types";
 import type { RoomStore } from "./store";
 
-/** NPC席の採点。席番号 → 点 を返す。段階4で /api/judge を呼ぶ実装に差し替える。 */
+/** NPC席の採点。席番号 → 点 を返す。 */
 export type NpcJudge = (room: Room, seats: number[]) => Promise<Record<number, 0 | 1 | 2>>;
 
 /** 乱数で採点するNPC。少し考えているような間を置く。 */
@@ -15,6 +16,42 @@ export const randomJudge: NpcJudge = async (_room, seats) => {
   const votes: Record<number, 0 | 1 | 2> = {};
   for (const seat of seats) votes[seat] = randomNpcVote(Math.random);
   return votes;
+};
+
+function isVote(v: unknown): v is 0 | 1 | 2 {
+  return v === 0 || v === 1 || v === 2;
+}
+
+/**
+ * サーバーの /api/judge 経由でLLMに採点させる。NPCの人数分を1回でまとめて頼む。
+ * 失敗したときは、その場で乱数採点に切り替える。
+ */
+export const apiJudge: NpcJudge = async (room, seats) => {
+  try {
+    const res = await fetch("/api/judge", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      signal: AbortSignal.timeout(7_000),
+      body: JSON.stringify({
+        odaiId: room.odaiId,
+        answer: room.answer,
+        npcIds: seats.map((seat) => room.seats[seat].slice(NPC_PREFIX.length)),
+      }),
+    });
+    if (!res.ok) throw new Error(`judge ${res.status}`);
+    const data = (await res.json()) as { votes?: unknown };
+    const list = Array.isArray(data.votes) ? data.votes : [];
+    if (list.length !== seats.length || !list.every(isVote)) throw new Error("judge: 不正な応答");
+    const votes: Record<number, 0 | 1 | 2> = {};
+    seats.forEach((seat, i) => {
+      votes[seat] = list[i];
+    });
+    return votes;
+  } catch {
+    const votes: Record<number, 0 | 1 | 2> = {};
+    for (const seat of seats) votes[seat] = randomNpcVote(Math.random);
+    return votes;
+  }
 };
 
 const TICK_MS = 100;
@@ -72,15 +109,18 @@ export function runHost(store: RoomStore, ctx: HostCtx, judge: NpcJudge): () => 
   const requestNpcVotes = async (room: Room) => {
     const seats = pendingNpcSeats(room);
     if (seats.length === 0) return;
+    // 上限を超えた部屋は、APIを呼ばずに乱数採点にする。
+    const overLimit = room.judgeCount >= JUDGE_LIMIT;
     let votes: Record<number, 0 | 1 | 2>;
     try {
-      votes = await judge(room, seats);
+      votes = await (overLimit ? randomJudge : judge)(room, seats);
     } catch {
       return; // 締切時に乱数で埋まる
     }
     const latest = store.get();
     if (stopped || !latest || latest.round !== room.round || latest.state !== "JUDGING") return;
     const patch: RoomPatch = {};
+    if (!overLimit) patch.judgeCount = latest.judgeCount + 1;
     for (const seat of pendingNpcSeats(latest)) {
       if (votes[seat] !== undefined) patch[`votes/${seat}`] = votes[seat];
     }

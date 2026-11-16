@@ -40,5 +40,8 @@ export const AFTER_SCORE_MS = 1_500;
 export const GRADE_HIGHLIGHT_MS = 800;
 export const GRADE_STAMP_MS = 1_600;
 
+/** 1部屋あたりの /api/judge の呼び出し上限（仮）。超えたら乱数採点。 */
+export const JUDGE_LIMIT = 50;
+
 /** NPCの乱数採点の重み（0点・1点・2点）。 */
 export const NPC_RANDOM_WEIGHTS = [0.5, 0.3, 0.2] as const;
